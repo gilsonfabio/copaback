@@ -1,6 +1,6 @@
 const connection = require('../database/connection');
 const bcrypt = require('bcrypt');
-const saltRounds = 10;
+const saltRounds = 12;
 require('dotenv/config');
 
 module.exports = {       
