@@ -12,14 +12,14 @@ module.exports = {
         
     async create(request, response) {
         const {apoJogId, apoTitulo, apoVlrAposta} = request.body;
-        const apoQtdAposta = 0;
+        const apoQtdApostas = 0;
         const apoStatus = 'A';
 
         const [apoId] = await connection('apogrupos').insert({
             apoJogId,
             apoTitulo,
             apoVlrAposta,
-            apoQtdAposta, 
+            apoQtdApostas, 
             apoStatus
         });
            
@@ -30,7 +30,7 @@ module.exports = {
         const id = request.params.jogId;
         try {            
           const lista = await connection("apogrupos")
-          
+            .where("apoJogId", id)
             .orderBy("apoId")
             .select("*");
       

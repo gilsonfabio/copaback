@@ -23,10 +23,11 @@ routes.post('/loginCpf', UsersController.loginCPF);
 
 routes.get('/grupos', GruposController.index);
 routes.post('/newgrupo', GruposController.create);
-routes.get('/lisGrupos', GruposController.lisGrupos);
+//routes.get('/lisGrupos/:eveId', GruposController.lisGrupos);
+routes.get("/eventos/:eveId/grupos", GruposController.lisGrupos);
 
 routes.get('/grpApostas/:jogId', GrpApostasController.lisGrpApostas);
-routes.post('/newgrpAposta', GruposController.create);
+routes.post('/newgrpAposta', GrpApostasController.create);
 
 routes.get('/selecoes', SelecoesController.index);
 routes.post('/newselecao', SelecoesController.create);

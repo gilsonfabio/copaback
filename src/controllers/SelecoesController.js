@@ -46,7 +46,6 @@ module.exports = {
 
     async lisSelecoes(request, response) {
         try {
-          // Se quiser permitir filtrar por grupo opcionalmente
           const grupoId = request.params.grpId;
       
           let query = connection("selecoes")
@@ -54,7 +53,7 @@ module.exports = {
             .orderBy([
               { column: "selGrpId" },
               { column: "selTipo" },
-              { column: "selName" }, // ou "selDescricao", conforme seu campo real
+              { column: "selName" }, 
             ])
             .select("selecoes.*", "grpcopa.grpDescricao");
       
@@ -63,6 +62,7 @@ module.exports = {
           }
       
           const selecoes = await query;
+          console.log(selecoes);
           return response.json(selecoes);
         } catch (error) {
           console.error("Erro ao listar seleções:", error);

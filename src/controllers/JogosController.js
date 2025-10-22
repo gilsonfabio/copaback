@@ -38,19 +38,35 @@ module.exports = {
         }
     },
 
-    async searchJogo(request, response) {        
+    async searchJogo(request, response) {
       try {
-        const jogo = request.params.jogId;
-        const lista = await connection("jogcopa")
-          .innerJoin('selecoes as times1', 'times1.selId', 'jogcopa.jogSelIdMan')
-          .innerJoin('selecoes as times2', 'times2.selId', 'jogcopa.jogSelIdVis')
-          .where('jogId', jogo)    
-          .select(["jogcopa.*", 'times1.selName As timeA_name', 'times2.selName As timeB_name']);
+        const { jogId } = request.params;
     
-        return response.json(lista);
+        if (!jogId) {
+          return response.status(400).json({ error: "ID do jogo não informado." });
+        }
+    
+        const jogo = await connection("jogcopa")
+          .innerJoin("selecoes as timeA", "timeA.selId", "jogcopa.jogSelIdMan")
+          .innerJoin("selecoes as timeB", "timeB.selId", "jogcopa.jogSelIdVis")
+          .where("jogcopa.jogId", jogId)
+          .select([
+            "jogcopa.*",
+            "timeA.selName as timeA_name",
+            "timeA.selAvatar as timeA_bandeira",
+            "timeB.selName as timeB_name",
+            "timeB.selAvatar as timeB_bandeira",
+          ])
+          .first();
+    
+        if (!jogo) {
+          return response.status(404).json({ error: "Jogo não encontrado." });
+        }
+    
+        return response.json(jogo);
       } catch (error) {
-        console.error("Erro ao listar jogos:", error);
-        return response.status(500).json({ error: "Erro ao listar jogos" });
+        console.error("Erro ao buscar jogo:", error);
+        return response.status(500).json({ error: "Erro interno ao buscar jogo." });
       }
     },
 
@@ -58,7 +74,6 @@ module.exports = {
       const { jogId, apoId, usrId, jogSelIdMan, jogSelIdVis, golMan, golVis, valor } = request.body;
   
       try {
-        // 1️⃣ Cria o palpite no banco e pega o ID gerado (palId)
         const [palId] = await connection("palpites").insert(
           {
             palJogId: jogId,
@@ -113,6 +128,7 @@ module.exports = {
           },
         });
         */
+        return response.status(200).json({ msn: "Palpite confirmado com sucesso!" });
       } catch (error) {
         console.error("❌ Erro ao criar palpite:", error.response?.data || error.message);
         return response.status(500).json({ error: "Erro ao salvar palpite" });

@@ -1,4 +1,5 @@
 const connection = require('../database/connection');
+const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 const saltRounds = 12;
 require('dotenv/config');
@@ -6,49 +7,50 @@ require('dotenv/config');
 module.exports = {       
     
     async signIn(request, response) {
-        let email = request.body.email;
-        let senha = request.body.password;
-
-        //console.log('Email:', email);
-        //console.log('Password:', senha);
-
+        const { email, password } = request.body;
+      
         const usuario = await connection('usuarios')
-            .where('usrEmail', email) 
-            .select(`usrId`, `usrNome`, `usrEmail`, `usrPassword`, `usrSldDisponivel`)
-            .first();
-        
-        if (!usuario) {            
-            return response.status(400).json({ error: 'Não encontrou usuário com este ID'});
-        } 
-
-        //console.log(user.usrPassword)
-        //let pass = usuario.usrPassword;
-        //const match = await bcrypt.compare(senha, pass)
-
-        //if(!match) {
-        //    return response.status(403).send({ auth: false, message: 'User invalid!' });
-        //}
-
-        const user = {
-            id: usuario.usrId,
-            name: usuario.usrNome,
-            email: usuario.usrEmail,
-            saldo: usuario.usrSldDisponivel
+          .where('usrEmail', email)
+          .select('usrId', 'usrNome', 'usrEmail', 'usrPassword')
+          .first();
+      
+        if (!usuario) {
+          return response.status(400).json({ error: 'Não encontrou usuário com este email' });
         }
+      
+        const match = await bcrypt.compare(password, usuario.usrPassword);
+        if (!match) {
+          return response.status(403).json({ auth: false, message: 'Usuário ou senha inválidos!' });
+        }
+      
+        const user = {
+          id: usuario.usrId,
+          name: usuario.usrNome,
+          email: usuario.usrEmail,
+        };
+      
+        const token = jwt.sign(
+          { id: user.id, name: user.name, email: user.email },
+          process.env.SECRET_JWT,
+          { expiresIn: '1h' }
+        );
+      
+        const refreshToken = jwt.sign(
+          { id: user.id, name: user.name, email: user.email },
+          process.env.SECRET_JWT_REFRESH,
+          { expiresIn: '2h' }
+        );
+      
+        return response.json({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          token,
+          refreshToken
+        });
+      },
 
-        //let token = jwt.sign({ id: user.usrId, name: user.usrNome, email: user.usrEmail, nivel: user.usrNivAcesso }, process.env.SECRET_JWT, {
-        //    expiresIn: '1h'
-        //});
-        //let refreshToken = jwt.sign({ id: user.usrId, name: user.usrNome, email: user.usrEmail, nivel: user.usrNivAcesso  }, process.env.SECRET_JWT_REFRESH, {
-        //    expiresIn: '2h'
-        //});
-        //console.log(user);
-        
-        return response.json(user);
-
-    },
-
-    async loginCPF(request, response) {
+      async loginCPF(request, response) {
         let cpf = request.body.qrCpf;
 
         //console.log('qrCpf:', cpf);
@@ -91,18 +93,16 @@ module.exports = {
 
     async newuser(request, response) {
         console.log(request.body);
-        const {nome, cpf, nascimento, email, celular , password} = request.body;
-        let saldo = 0.00;
+        const {nome, email, telefone, dataNascimento, password, timeDoCoracao} = request.body;
         let status = 'A'; 
         let snhCrypt = await bcrypt.hash(password, saltRounds);
         const [usrId] = await connection('usuarios').insert({
             usrNome: nome, 
             usrEmail: email, 
-            usrCpf: cpf, 
-            usrCelular: celular, 
-            usrNascimento: nascimento, 
+            usrCelular: telefone, 
+            usrNascimento: dataNascimento, 
             usrPassword: snhCrypt, 
-            usrSldDisponivel: saldo, 
+            usrTime: timeDoCoracao,
             usrStatus: status  
         });
            
