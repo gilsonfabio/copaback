@@ -37,6 +37,8 @@ routes.get('/lisJogos/:grpId', JogosController.lisJogos);
 routes.post('/criarPalpite', JogosController.criarPalpite);
 routes.get('/searchJogo/:jogId', JogosController.searchJogo);
 
+routes.get('/lisPalpites/:apoId', JogosController.lisPalpites);
+
 routes.get('/eventos', EventosController.index);
 routes.post('/newevento', EventosController.create);
 routes.get('/lisEventos', EventosController.lisEventos);

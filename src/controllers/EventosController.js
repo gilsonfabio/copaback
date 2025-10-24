@@ -11,11 +11,11 @@ module.exports = {
     },    
         
     async create(request, response) {
-        const {eveDescricao} = request.body;
+        const {eveTitulo, datInicial, datFinal, eveLocal, eveDescricao} = request.body;
         const [eveId] = await connection('eveEsportivos').insert({
             eveTitulo,
-            eveDatInicio,
-            eveDatFinal,
+            eveDatInicial: datInicial,
+            eveDatFinal: datFinal,
             eveLocal,
             eveDescricao 
         });

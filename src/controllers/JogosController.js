@@ -134,4 +134,23 @@ module.exports = {
         return response.status(500).json({ error: "Erro ao salvar palpite" });
       }
     },
+
+    async lisPalpites(request, response) {        
+      try {
+        const grp = request.params.apoId;
+        const lista = await connection("palpites")
+          .join('usuarios', 'usrId', 'palpites.palUsrId')
+          .join('apogrupos', 'apoId', 'palpites.palApoId')
+          .innerJoin('selecoes as times1', 'times1.selId', 'palpites.palSelIdMan')
+          .innerJoin('selecoes as times2', 'times2.selId', 'palpites.palSelIdVis')
+          .where('palApoId', grp)    
+          .orderBy("palId")
+          .select(["palpites.*", 'times1.selName As timeA_name', 'times2.selName As timeB_name', 'usuarios.usrNome', 'apogrupos.apoTitulo']);
+    
+        return response.json(lista);
+      } catch (error) {
+        console.error("Erro ao listar jogos:", error);
+        return response.status(500).json({ error: "Erro ao listar jogos" });
+      }
+  },
 };
