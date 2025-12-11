@@ -1,55 +1,73 @@
-const { Console } = require('console');
-const connection = require('../database/connection');
+const axios = require("axios");
+const connection = require("../database/connection");
 
-module.exports = {   
-    async webhook(request, response) {
-        try {
-          // ✅ Recebe dados do PagSeguro
-          const payload = request.body;
-          console.log("📩 Webhook recebido:", JSON.stringify(payload, null, 2));
-    
-          // Identifica o ID de referência
-          const referenceId = payload.reference_id || payload.id;
-          console.log("🔗 Reference ID recebido:", referenceId);
-    
-          if (!referenceId) {
-            return response.status(400).json({ error: "reference_id ausente" });
+module.exports = {
+  async webhook(request, response) {
+    try {
+      const payload = request.body;
+      console.log("📩 Webhook recebido (V4):", JSON.stringify(payload, null, 2));
+
+      const chargeId = payload?.data?.id;
+
+      if (!chargeId) {
+        return response.status(400).json({ error: "charge_id ausente" });
+      }
+
+      // Buscar o charge na API V4
+      const chargeDetail = await axios.get(
+        `https://api.pagseguro.com/payments/v4/charges/${chargeId}`,
+        {
+          headers: {
+            Authorization: process.env.PAGSEGURO_TOKEN,
+            "Content-Type": "application/json"
           }
-    
-          // 🔍 Extrai o palId da referência — ex: "palpite_123"
-          const match = referenceId.match(/^palpite_(\d+)/);
-          const palId = match ? Number(match[1]) : null;
-    
-          if (!palId) {
-            console.warn("⚠️ reference_id não corresponde ao padrão esperado:", referenceId);
-            return response.status(400).json({ error: "Formato inválido de reference_id" });
-          }
-    
-          // 🔄 Extrai status da cobrança
-          const charge = payload.charges?.[0];
-          const status = charge?.status?.toUpperCase();
-    
-          console.log(`💰 Status da cobrança (palId ${palId}):`, status);
-    
-          // ✅ Se o pagamento foi confirmado, atualiza o palpite
-          if (status === "PAID" || status === "COMPLETED" || status === "PAID_PENDING_REVIEW") {
-            await connection("palpites")
-              .where({ palId })
-              .update({
-                palStatus: 2, // pago
-                palPagoEm: new Date(),
-              });
-    
-            console.log("✅ Palpite confirmado e atualizado no banco:", palId);
-          } else {
-            console.log("ℹ️ Pagamento ainda não confirmado:", status);
-          }
-    
-          // Retorna sucesso ao PagSeguro
-          return response.status(200).json({ received: true });
-        } catch (err) {
-          console.error("❌ Erro no webhook:", err);
-          return response.status(500).json({ error: "Erro interno no webhook" });
         }
-      },         
+      );
+
+      const charge = chargeDetail.data;
+
+      console.log("🔎 Detalhes do charge:", charge);
+
+      const referenceId = charge.reference_id;
+      const status = charge.status?.toUpperCase();
+
+      if (!referenceId) {
+        return response.status(400).json({ error: "reference_id não encontrado" });
+      }
+
+      // extrair id
+      const palId = Number(referenceId.replace("palpite_", ""));
+
+      const palpite = await connection("palpites")
+        .where({ palId })
+        .first();
+
+      if (!palpite) {
+        return response.status(404).json({ error: "Palpite não encontrado" });
+      }
+
+      // se já pago
+      if (palpite.palStatus === 2) {
+        return response.status(200).json({ duplicated: true });
+      }
+
+      // pago
+      if (status === "PAID") {
+        await connection("palpites")
+          .where({ palId })
+          .update({
+            palStatus: 2,
+            palPagoEm: new Date()
+          });
+
+        console.log("✅ Pagamento confirmado!");
+      }
+
+      return response.status(200).json({ ok: true });
+
+    } catch (err) {
+      console.error("❌ Erro no webhook V4:", err);
+      return response.status(500).json({ error: "Erro interno" });
+    }
+  }
 };

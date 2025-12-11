@@ -1,5 +1,6 @@
 const { Console } = require('console');
 const connection = require('../database/connection');
+const axios = require("axios");
 
 module.exports = {   
     async index (request, response) {
@@ -8,7 +9,29 @@ module.exports = {
         .select('*');
         
         return response.json(jogos);
-    },    
+    },
+    
+    async statusPalpite (request, response) {
+      try {
+        const { palId } = request.params;
+    
+        const palpite = await connection("palpites")
+          .where({ palId })
+          .first();
+    
+        if (!palpite) {
+          return response.status(404).json({ error: "Palpite não encontrado" });
+        }
+    
+        return response.json({
+          status: palpite.palStatus, // 1 = aguardando / 2 = pago
+        });
+    
+      } catch (err) {
+        console.error(err);
+        return response.status(500).json({ error: "Erro ao consultar status" });
+      }
+    },
         
     async create(request, response) {
         const {jogData} = request.body;
@@ -29,7 +52,7 @@ module.exports = {
             .innerJoin('selecoes as times2', 'times2.selId', 'jogcopa.jogSelIdVis')
             .where('jogGrpId', grp)    
             .orderBy("jogId")
-            .select(["jogcopa.*", 'times1.selName As timeA_name', 'times2.selName As timeB_name']);
+            .select(["jogcopa.*", 'times1.selName As timeA_name', 'times1.selAvatar As selAvatarA', 'times2.selName As timeB_name', 'times2.selAvatar As selAvatarB']);
       
           return response.json(lista);
         } catch (error) {
@@ -72,69 +95,98 @@ module.exports = {
 
     async criarPalpite(request, response) {
       const { jogId, apoId, usrId, jogSelIdMan, jogSelIdVis, golMan, golVis, valor } = request.body;
-  
+    
       try {
-        const [palId] = await connection("palpites").insert(
-          {
-            palJogId: jogId,
-            palApoId: apoId,
-            palUsrId: usrId,
-            palSelIdMan: jogSelIdMan,
-            palSelIdVis: jogSelIdVis,
-            palSelGolMan: golMan,
-            palSelGolVis: golVis,
-            palValor: valor,
-            palStatus: 1,
-          }    
-        );
-  
-        /*
-        // 2️⃣ Cria a cobrança PIX no PagSeguro
+        // 1️⃣ Salvar palpite
+        const [palId] = await connection("palpites").insert({
+          palJogId: jogId,
+          palApoId: apoId,
+          palUsrId: usrId,
+          palSelIdMan: jogSelIdMan,
+          palSelIdVis: jogSelIdVis,
+          palSelGolMan: golMan,
+          palSelGolVis: golVis,
+          palValor: valor,
+          palStatus: 1,
+        });
+    
         const PAGSEGURO_TOKEN = process.env.PAGSEGURO_TOKEN;
-        const WEBHOOK_URL = process.env.PAGSEGURO_WEBHOOK_URL; // 🔗 URL do seu webhook
-  
+        const WEBHOOK_URL = process.env.PAGSEGURO_WEBHOOK_URL;
+    
+        // 2️⃣ Buscar usuário
+        const user = await connection("usuarios")
+          .where("usrId", usrId)
+          .select("usrNome", "usrEmail", "usrCpf")
+          .first();
+    
+        if (!user) {
+          return response.status(400).json({ error: "Usuário não encontrado" });
+        }
+
+        const expirationDate = new Date(Date.now() + 3600 * 1000).toISOString();
+    
         const headers = {
           Authorization: `Bearer ${PAGSEGURO_TOKEN}`,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         };
-  
+    
+        // 3️⃣ Criar cobrança PIX (API V4)
+              
         const body = {
-          reference_id: `palpite_${palId}`, // 🔹 agora usa o ID real do palpite
-          description: `Palpite jogo ${jogId}`,
+          reference_id: `palpite_${palId}`,
           amount: {
-            value: Math.round(valor * 100), // em centavos
-            currency: "BRL",
+            value: Number(valor),
+            currency: "BRL"
           },
           payment_method: {
             type: "PIX",
+            pix: {
+              "expires_in": 3600
+            }
           },
-          notification_urls: [WEBHOOK_URL], // 🔔 URL do webhook
+          customer: {
+            name: user.usrNome,
+            email: user.usrEmail,
+            tax_id: String(user.usrCpf).replace(/\D/g, "")
+          }
         };
-  
-        const pagseguroRes = await axios.post(
-          "https://sandbox.api.pagseguro.com/orders",
+
+        console.log("\n📤 Enviando CHARGE V4:", JSON.stringify(body, null, 2));
+    
+        const chargeRes = await axios.post(
+          "https://sandbox.api.pagseguro.com/charges",
           body,
           { headers }
         );
-  
-        const qrData = pagseguroRes.data.qr_codes?.[0];
-  
+    
+        console.log("📥 CHARGE criada:", JSON.stringify(chargeRes.data, null, 2));
+    
+        const charge = chargeRes.data;
+    
+        // 4️⃣ Obter QR Code PIX
+        const pixInfo = charge.payment_method?.pix;
+        if (!pixInfo) {
+          return response.status(500).json({ error: "PIX não retornou dados válidos" });
+        }
+    
+        const qrCode = pixInfo.qr_code;
+        const qrImage = pixInfo.qr_code_base64; // imagem base64
+    
         return response.status(201).json({
-          message: "Palpite criado e pagamento gerado",
+          message: "Palpite criado com sucesso!",
           palId,
           pix: {
-            payload: qrData.text, // código PIX copiável
-            image: qrData.links?.[0]?.href, // imagem QRCode do PagSeguro
-          },
+            copia_cola: qrCode,
+            imagem_base64: qrImage
+          }
         });
-        */
-        return response.status(200).json({ msn: "Palpite confirmado com sucesso!" });
+    
       } catch (error) {
-        console.error("❌ Erro ao criar palpite:", error.response?.data || error.message);
-        return response.status(500).json({ error: "Erro ao salvar palpite" });
+        console.error("❌ Erro PagSeguro:", error.response?.data || error);
+        return response.status(500).json({ error: "Erro ao criar palpite" });
       }
     },
-
+    
     async lisPalpites(request, response) {        
       try {
         const grp = request.params.apoId;
@@ -152,5 +204,5 @@ module.exports = {
         console.error("Erro ao listar jogos:", error);
         return response.status(500).json({ error: "Erro ao listar jogos" });
       }
-  },
+    },
 };
