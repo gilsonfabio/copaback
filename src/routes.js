@@ -28,7 +28,8 @@ routes.get("/eventos/:eveId/grupos", GruposController.lisGrupos);
 
 routes.get('/grpApostas/:jogId', GrpApostasController.lisGrpApostas);
 routes.post('/newgrpAposta', GrpApostasController.create);
-
+routes.get('/searchGrupo/:apoId', GrpApostasController.searchGrupo);
+            
 routes.get('/selecoes', SelecoesController.index);
 routes.post('/newselecao', SelecoesController.create);
 routes.get('/lisSelecoes', SelecoesController.lisSelecoes);
