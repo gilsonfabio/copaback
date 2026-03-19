@@ -36,11 +36,33 @@ module.exports = {
             .orderBy("apoId")
             .select("*");
       
-          return response.json(lista);
+            console.log(lista)
+            return response.json(lista);
         } catch (error) {
           console.error("Erro ao listar grupos apostas:", error);
           return response.status(500).json({ error: "Erro ao listar grupos apostas" });
         }
+    },
+
+    async getById(request, response) {
+      const { id } = request.params;
+
+      const jogo = await connection("jogEsportivos")
+        .where("jogId", id)
+        .innerJoin('equEsportivas as times1', 'times1.selId', 'jogEsportivos.jogSelIdMan')
+        .innerJoin('equEsportivas as times2', 'times2.selId', 'jogEsportivos.jogSelIdVis')
+        .select([
+          "jogEsportivos.*",
+          'times1.selName as timeA_name',
+          'times1.selCor1 as timeA_color1',
+          'times1.selCor2 as timeA_color2',
+          'times2.selName as timeB_name',
+          'times2.selCor1 as timeB_color1',
+          'times2.selCor2 as timeB_color2',
+        ])     
+        .first();
+
+      return response.json(jogo);
     },
 
   async searchGrupo(request, response) {
@@ -54,13 +76,13 @@ module.exports = {
       }
 
       const grupo = await connection("apogrupos")
-        .innerJoin("jogcopa", "jogcopa.jogId", "apogrupos.apoJogId") 
-        .innerJoin("selecoes as timeA", "timeA.selId", "jogcopa.jogSelIdMan")
-        .innerJoin("selecoes as timeB", "timeB.selId", "jogcopa.jogSelIdVis")
+        .innerJoin("jogEsportivos", "jogEsportivos.jogId", "apogrupos.apoJogId") 
+        .innerJoin("equEsportivas as timeA", "timeA.selId", "jogEsportivos.jogSelIdMan")
+        .innerJoin("equEsportivas as timeB", "timeB.selId", "jogEsportivos.jogSelIdVis")
         .where("apogrupos.apoId", apoId)
         .select([
           "apogrupos.*",
-          "jogcopa.*",
+          "jogEsportivos.*",
           "timeA.selName as timeA_name",
           "timeA.selAvatar as timeA_bandeira",
           "timeB.selName as timeB_name",

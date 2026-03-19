@@ -26,15 +26,16 @@ routes.post('/newgrupo', GruposController.create);
 //routes.get('/lisGrupos/:eveId', GruposController.lisGrupos);
 routes.get("/eventos/:eveId/grupos", GruposController.lisGrupos);
 
-routes.get('/grpApostas/:jogId', GrpApostasController.lisGrpApostas);
+routes.get('/lisGrpApostas/:jogId', GrpApostasController.lisGrpApostas);
 routes.post('/newgrpAposta', GrpApostasController.create);
 routes.get('/searchGrupo/:apoId', GrpApostasController.searchGrupo);
+routes.get('/jogo/:id', GrpApostasController.getById);
             
 routes.get('/selecoes', SelecoesController.index);
 routes.post('/newselecao', SelecoesController.create);
 routes.get('/lisSelecoes', SelecoesController.lisSelecoes);
 
-routes.get('/lisJogos/:grpId', JogosController.lisJogos);
+routes.get('/lisJogos/:datInicial', JogosController.lisJogos);
 routes.post('/criarPalpite', JogosController.criarPalpite);
 routes.get('/searchJogo/:jogId', JogosController.searchJogo);
 
